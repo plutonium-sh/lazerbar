@@ -23,4 +23,4 @@ btw this is Hyprland only because it's lwk the best twm ever
 - run qs -c lazerbar (or put it in your exec-once)
 - try it out!
 
-# jsyk, i donated 10 euros to KDE for their 30th birthday and i am now no longer a linux larp :D
+# jsyk, i donated 10 euros to KDE for their 30th birthday and now i'm NOT a linux larp
