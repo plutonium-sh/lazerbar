@@ -17,5 +17,10 @@ btw this is Hyprland only because it's lwk the best twm ever
 - [Torus font](https://github.com/ppy/osu-web/tree/master/resources/fonts/torus)
 - Optional: nmcli, brightnessctl, hyprshot, gtk-launch
 
+## installation
+- git clone the repo
+- drop the clone into ~/.config/quickshell/
+- run qs -c lazerbar (or put it in your exec-once)
+- try it out!
 
 # jsyk, i donated 10 euros to KDE for their 30th birthday and i am now no longer a linux larp :D
