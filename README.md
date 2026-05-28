@@ -7,7 +7,7 @@ btw this is Hyprland only because it's lwk the best twm ever
 ## features
 - **top bar** -- basically the osu!lazer top bar, but a Hyprland top bar
 - **cc** -- calendar, weather, battery (i'm on desktop idk if this works or not), notif center, pomodoro timer, brightness slider, wifi manager, and system info
-- **settings** -- toggle top bar elements, pick wallpaper, customize colors, and spectrum visualizer
+- **settings** -- toggle top bar elements, pick wallpaper, customize colors, and audio spectrum visualizer
 - **lockscreen** -- PAM auth, this lwk just exists 👍
 - **notifications** -- dopamine.
 
