@@ -3,9 +3,10 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Wayland
 
 // floating window of questionable life choices
-FloatingWindow {
+PanelWindow {
     id: root
 
     property string accentColor: "#ff6b9d"
@@ -20,10 +21,16 @@ FloatingWindow {
     signal wallpaperApplyRequested(string path)
 
     visible: false
-    width: 800
-    height: 600
-    title: "Wallpaper Selector"
-    color: root.bgColor
+    // sit at the bottom like a good little panel
+    anchors { left: true; right: true; bottom: true }
+    margins { bottom: 10 }
+    implicitHeight: 480
+    color: "transparent"
+    // float above everything else without stealing screen real estate
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "quickshell:wallpaper_selector"
+    exclusionMode: ExclusionMode.Ignore
+    exclusiveZone: 0
 
     // the world's most basic file registry
     ListModel { id: wallpaperModel }
@@ -80,8 +87,16 @@ FloatingWindow {
 
     // the container for your containment needs
     Rectangle {
-        anchors.fill: parent
+        anchors {
+            fill: parent
+            leftMargin: 40
+            rightMargin: 40
+            bottomMargin: 0
+        }
+        radius: 8
         color: root.bgColor
+        border.color: root.borderColor
+        border.width: 1
 
         ColumnLayout {
             anchors.fill: parent
