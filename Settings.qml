@@ -32,7 +32,6 @@ Rectangle {
     property bool showMediaDisplay: true
     property bool wallpaperEnabled: true
     property string wallpaperSource: "osu"
-    property var wallpaperList: []
     property var barValues: []
     property int barCount: 24
     property string accentColor: "#ec8fbe"
@@ -49,8 +48,8 @@ Rectangle {
     property bool spectrumHexInput: false
     property var customThemes: []
 
-    signal fetchWallpaperRequested(string source)
     signal setWallpaperRequested(string filePath)
+    signal openWallpaperPicker()
 
     property var activePlayer: (Mpris && Mpris.players && Mpris.players.values.length > 0)
         ? (Mpris.players.values.find(p => p.playbackState === MprisPlaybackState.Playing) || Mpris.players.values[0])
@@ -135,24 +134,6 @@ Rectangle {
         running: false
     }
 
-    // find is not a feeling, it's a command
-    Process {
-        id: wallpaperListProc
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var lines = text.trim().split('\n');
-                settingsContainer.wallpaperList = lines.filter(function(f) { return f.trim() && f.endsWith('.jpg'); });
-            }
-        }
-    }
-
-    // find is not a feeling, it's a command
-    function refreshWallpaperList() {
-        wallpaperListProc.command = ["find", Quickshell.env("HOME") + "/.config/quickshell/lazerbar/wallpapers", "-maxdepth", "1", "-name", "*.jpg"];
-        wallpaperListProc.running = true;
-    }
-
     // serializing the entire universe every 500ms
     Timer {
         id: saveDebounce
@@ -235,9 +216,46 @@ Rectangle {
         function onBarOpacityChanged() { autoSave() }
         function onHexInputChanged() { autoSave() }
         function onSpectrumHexInputChanged() { autoSave() }
-        function onWallpaperEnabledChanged() { autoSave();
-            if (settingsContainer.wallpaperEnabled) settingsContainer.refreshWallpaperList() }
+        function onWallpaperEnabledChanged() { autoSave() }
         function onWallpaperSourceChanged() { autoSave() }
+    }
+
+    // inline wallpaper fetch via curl
+    Process {
+        id: apiFetchProc
+        running: false
+        property string sourceType: "osu"
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var text = this.text.trim()
+                if (text.length === 0) return
+                try {
+                    var data = JSON.parse(text)
+                    var items = apiFetchProc.sourceType === "osu" ? (data.backgrounds || []) : data
+                    if (items.length === 0) return
+                    var item = items[Math.floor(Math.random() * items.length)]
+                    var url = apiFetchProc.sourceType === "osu" ? item.url : (item.jpeg_url || item.file_url)
+                    var filename = decodeURIComponent(url.substring(url.lastIndexOf('/') + 1).split('?')[0])
+                    var cacheDir = Quickshell.env("HOME") + "/.config/quickshell/lazerbar/wallpapers"
+                    var filePath = cacheDir + "/" + filename
+                    var escaped = url.replace(/'/g, "'\\''")
+                    dlFetchProc.filePath = filePath
+                    dlFetchProc.command = ["sh", "-c",
+                        "mkdir -p '" + cacheDir + "' && [ -f '" + filePath + "' ] || curl -s -L --connect-timeout 5 --max-time 30 --retry 2 -e 'https://konachan.com/' -H 'User-Agent: Mozilla/5.0' -o '" + filePath + "' '" + escaped + "' && echo done"]
+                    dlFetchProc.running = true
+                } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: dlFetchProc
+        running: false
+        property string filePath: ""
+        onExited: (code) => {
+            if (code === 0) {
+                settingsContainer.setWallpaperRequested(dlFetchProc.filePath)
+            }
+        }
     }
 
     RowLayout {
@@ -356,10 +374,6 @@ Rectangle {
                     Layout.fillHeight: true
                     visible: settingsContainer.activeCategory === 0
                     clip: true
-                    onVisibleChanged: {
-                        if (visible && settingsContainer.wallpaperEnabled)
-                            settingsContainer.refreshWallpaperList();
-                    }
 
                     Flickable {
                         anchors.fill: parent
@@ -463,66 +477,44 @@ Rectangle {
                             Rectangle {
                                 Layout.preferredWidth: 26; Layout.preferredHeight: 26; radius: 4; color: settingsContainer.accentColor
                                 Text { anchors.centerIn: parent; text: "\u21BB"; color: "#181818"; font.pixelSize: 14; font.bold: true }
-                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.fetchWallpaperRequested(settingsContainer.wallpaperSource) }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: {
+                                    apiFetchProc.sourceType = settingsContainer.wallpaperSource
+                                    var url = settingsContainer.wallpaperSource === "osu"
+                                        ? "https://osu.ppy.sh/api/v2/seasonal-backgrounds"
+                                        : "https://konachan.com/post.json?limit=1&tags=rating%3Asafe+order%3Arandom"
+                                    apiFetchProc.command = ["curl", "-s", "--connect-timeout", "5", "--max-time", "10", "-A", "lazerbar/1.0", url]
+                                    apiFetchProc.running = true
+                                } }
                             }
                         }
 
-                        Text {
-                            Layout.fillWidth: true
-                            Layout.leftMargin: 16
-                            Layout.topMargin: 4
-                            visible: settingsContainer.wallpaperEnabled
-                            text: "wallpapers"
-                            color: "#888888"
-                            font.family: "Torus"
-                            font.pixelSize: 11
-                        }
-
-                        Flow {
-                            id: pickerFlow
+                        Rectangle {
+                            id: browseBtn
                             Layout.fillWidth: true
                             Layout.leftMargin: 16
                             Layout.rightMargin: 16
-                            visible: settingsContainer.wallpaperEnabled && settingsContainer.wallpaperList.length > 0
-                            spacing: 6
+                            Layout.preferredHeight: 36
+                            visible: settingsContainer.wallpaperEnabled
+                            radius: 6
+                            color: browseMouse.containsMouse ? settingsContainer.accentColor : settingsContainer.surfaceColor
+                            Behavior on color { ColorAnimation { duration: 120 } }
 
-                            Repeater {
-                                model: settingsContainer.wallpaperList
+                            Text {
+                                anchors.centerIn: parent
+                                text: "browse wallpapers"
+                                color: browseMouse.containsMouse ? "#181818" : "#ffffff"
+                                font.family: "Torus"
+                                font.pixelSize: 12
+                                font.bold: true
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                            }
 
-                                Rectangle {
-                                    width: (pickerFlow.width - 12) / 3
-                                    height: 72
-                                    radius: 6
-                                    clip: true
-                                    color: settingsContainer.surfaceColor
-
-                                    Image {
-                                        anchors.fill: parent
-                                        source: "file://" + modelData.split('/').map(encodeURIComponent).join('/')
-                                        fillMode: Image.PreserveAspectCrop
-                                        asynchronous: true
-                                        sourceSize.width: 120
-                                        sourceSize.height: 72
-                                    }
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        color: "transparent"
-                                        border.color: settingsContainer.accentColor
-                                        border.width: 2
-                                        radius: 6
-                                        opacity: mouseArea.containsMouse ? 1 : 0
-                                        Behavior on opacity { NumberAnimation { duration: 120 } }
-                                    }
-
-                                    MouseArea {
-                                        id: mouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: settingsContainer.setWallpaperRequested(modelData)
-                                    }
-                                }
+                            MouseArea {
+                                id: browseMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: settingsContainer.openWallpaperPicker()
                             }
                         }
 
