@@ -538,6 +538,7 @@ PanelWindow {
 
             } // visibleArea
         } // barContent
+
     } // PanelWindow
 
 // notifications - because i can't go 10 milliseconds without dopamine
@@ -642,8 +643,8 @@ PanelWindow {
         Settings {
             id: settingsPanel
             anchors.fill: parent
-            onFetchWallpaperRequested: (source) => wallpaperChanger.fetchRandom(source)
             onSetWallpaperRequested: (filePath) => wallpaperChanger.setDirect(filePath)
+            onOpenWallpaperPicker: wallpaperSelector.show()
         }
     }
 
