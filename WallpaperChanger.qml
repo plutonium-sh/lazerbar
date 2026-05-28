@@ -17,8 +17,9 @@ PanelWindow {
     property string savedWallpaper: ""
 
     readonly property string home: Quickshell.env("HOME")
-    readonly property string cacheDir: home + "/.config/quickshell/lazerbar/wallpapers"
-    readonly property string wallpaperJson: home + "/.config/quickshell/lazerbar/wallpapers/wallpapers.json"
+    readonly property string configDir: home + "/.config/quickshell/lazerbar"
+    readonly property string cacheDir: configDir + "/wallpapers"
+    readonly property string wallpaperJson: configDir + "/wallpapers.json"
 
     // unprivileged background noise, don't mind me
     WlrLayershell.layer: WlrLayer.Background
@@ -72,8 +73,9 @@ PanelWindow {
                 try {
                     var data = JSON.parse(text.trim());
                     if (data.current && root.enabled) {
-                        root.savedWallpaper = data.current;
-                        root.setDirect(data.current);
+                        var fullPath = data.current.startsWith("/") ? data.current : root.configDir + "/" + data.current;
+                        root.savedWallpaper = fullPath;
+                        root.setDirect(fullPath);
                     }
                 } catch (e) {}
             }
@@ -83,7 +85,9 @@ PanelWindow {
     // the world's most overqualified wallpaper saver
     function saveWallpaperJson(filePath) {
         root.savedWallpaper = filePath;
-        var data = JSON.stringify({"current": filePath});
+        // store path relative to configDir for portability
+        var relPath = filePath.startsWith(root.configDir + "/") ? filePath.substring(root.configDir.length + 1) : filePath;
+        var data = JSON.stringify({"current": relPath});
         var sanitized = data.replace(/'/g, "'\\''");
         jsonWriter.command = ["sh", "-c", "echo '" + sanitized + "' > " + root.wallpaperJson];
         jsonWriter.running = true;
