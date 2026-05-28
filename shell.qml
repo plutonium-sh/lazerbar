@@ -803,7 +803,16 @@ PanelWindow {
     WallpaperChanger {
         id: wallpaperChanger
         enabled: settingsPanel.wallpaperEnabled
-        onFetchCompleted: settingsPanel.refreshWallpaperList()
+    }
+
+    // wallpaper selector - grid browser
+    WallpaperSelector {
+        id: wallpaperSelector
+        accentColor: settingsPanel.accentColor
+        bgColor: settingsPanel.bgColor
+        surfaceColor: settingsPanel.surfaceColor
+        borderColor: settingsPanel.borderColor
+        onWallpaperApplyRequested: (filePath) => wallpaperChanger.setDirect(filePath)
     }
 
     // lock screen
