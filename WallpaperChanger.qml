@@ -16,11 +16,8 @@ PanelWindow {
     property string currentSrc: ""
     property string savedWallpaper: ""
 
-    signal fetchCompleted()
-
     readonly property string home: Quickshell.env("HOME")
     readonly property string cacheDir: home + "/.config/quickshell/lazerbar/wallpapers"
-    readonly property string fetchScript: home + "/.config/quickshell/lazerbar/fetch-wallpapers"
     readonly property string wallpaperJson: home + "/.config/quickshell/lazerbar/wallpapers/wallpapers.json"
 
     // unprivileged background noise, don't mind me
@@ -52,41 +49,12 @@ PanelWindow {
         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     }
 
-    // go touch the outside internet so you don't have to
-    function fetchRandom(source) {
-        if (fetchProc.running) return;
-        fetchProc.command = [root.fetchScript, source];
-        fetchProc.running = true;
-    }
-
     // no-nonsense wallpaper mode: cut the middleman
     function setDirect(filePath) {
         fadeOverlay.opacity = 1.0;
         swapTimer.filePath = "file://" + filePath.split('/').map(encodeURIComponent).join('/');
         swapTimer.start();
         saveWallpaperJson(filePath);
-    }
-
-    // silently eating errors like a pro
-    Process {
-        id: fetchProc
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    var raw = text.trim();
-                    if (!raw) return;
-                    var wp = JSON.parse(raw);
-                    if (wp.file) {
-                        fadeOverlay.opacity = 1.0;
-                        swapTimer.filePath = "file://" + wp.file.split('/').map(encodeURIComponent).join('/');
-                        swapTimer.start();
-                        root.saveWallpaperJson(wp.file);
-                        root.fetchCompleted();
-                    }
-                } catch (e) {}
-            }
-        }
     }
 
     // glorified echo command with delusions of grandeur
@@ -102,7 +70,7 @@ PanelWindow {
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    var data = JSON.parse(text().trim());
+                    var data = JSON.parse(text.trim());
                     if (data.current && root.enabled) {
                         root.savedWallpaper = data.current;
                         root.setDirect(data.current);
