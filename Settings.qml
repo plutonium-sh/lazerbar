@@ -220,41 +220,42 @@ Rectangle {
         function onWallpaperSourceChanged() { autoSave() }
     }
 
-    // inline wallpaper fetch via curl
+    // inline wallpaper fetch via curl+jq
+    function fetchWallpaper() {
+        var cacheDir = Quickshell.env("HOME") + "/.config/quickshell/lazerbar/wallpapers"
+        var src = settingsContainer.wallpaperSource
+        var apiUrl = src === "osu"
+            ? "https://osu.ppy.sh/api/v2/seasonal-backgrounds"
+            : "https://konachan.net/post.json?limit=1&tags=rating%3Asafe+order%3Arandom"
+        var jqExpr = src === "osu"
+            ? ".backgrounds[0].url // empty"
+            : "(.[0] | .jpeg_url // .file_url // empty)"
+
+        var cmd = "url=$(curl -s -H 'User-Agent: Mozilla/5.0' '" + apiUrl + "' | jq -r '" + jqExpr + "') && " +
+            "test -n \"$url\" && test \"$url\" != \"null\" || exit 1; " +
+            "fname=$(basename \"${url%%\\?*}\" | python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))') && " +
+            "mkdir -p '" + cacheDir + "' && fpath=\"" + cacheDir + "/$fname\" && " +
+            "if [ -f \"$fpath\" ]; then echo \"$fpath\"; " +
+            "else curl -sL --connect-timeout 10 --max-time 60 -o \"$fpath\" \"$url\" && echo \"$fpath\"; fi"
+        console.log("fetchWallpaper: cmd=", cmd)
+        apiFetchProc.command = ["sh", "-c", cmd]
+        apiFetchProc.running = true
+    }
+
     Process {
         id: apiFetchProc
         running: false
-        property string sourceType: "osu"
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var text = this.text.trim()
-                if (text.length === 0) return
-                try {
-                    var data = JSON.parse(text)
-                    var items = apiFetchProc.sourceType === "osu" ? (data.backgrounds || []) : data
-                    if (items.length === 0) return
-                    var item = items[Math.floor(Math.random() * items.length)]
-                    var url = apiFetchProc.sourceType === "osu" ? item.url : (item.jpeg_url || item.file_url)
-                    var filename = decodeURIComponent(url.substring(url.lastIndexOf('/') + 1).split('?')[0])
-                    var cacheDir = Quickshell.env("HOME") + "/.config/quickshell/lazerbar/wallpapers"
-                    var filePath = cacheDir + "/" + filename
-                    var escaped = url.replace(/'/g, "'\\''")
-                    dlFetchProc.filePath = filePath
-                    dlFetchProc.command = ["sh", "-c",
-                        "mkdir -p '" + cacheDir + "' && [ -f '" + filePath + "' ] || curl -s -L --connect-timeout 5 --max-time 30 --retry 2 -e 'https://konachan.com/' -H 'User-Agent: Mozilla/5.0' -o '" + filePath + "' '" + escaped + "' && echo done"]
-                    dlFetchProc.running = true
-                } catch (e) {}
+        stdout: SplitParser {
+            onRead: data => {
+                var path = data.trim()
+                console.log("apiFetchProc stdout:", path)
+                if (path.length > 0) {
+                    settingsContainer.setWallpaperRequested(path)
+                }
             }
         }
-    }
-    Process {
-        id: dlFetchProc
-        running: false
-        property string filePath: ""
         onExited: (code) => {
-            if (code === 0) {
-                settingsContainer.setWallpaperRequested(dlFetchProc.filePath)
-            }
+            console.log("apiFetchProc exited with code:", code)
         }
     }
 
@@ -477,14 +478,7 @@ Rectangle {
                             Rectangle {
                                 Layout.preferredWidth: 26; Layout.preferredHeight: 26; radius: 4; color: settingsContainer.accentColor
                                 Text { anchors.centerIn: parent; text: "\u21BB"; color: "#181818"; font.pixelSize: 14; font.bold: true }
-                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: {
-                                    apiFetchProc.sourceType = settingsContainer.wallpaperSource
-                                    var url = settingsContainer.wallpaperSource === "osu"
-                                        ? "https://osu.ppy.sh/api/v2/seasonal-backgrounds"
-                                        : "https://konachan.com/post.json?limit=1&tags=rating%3Asafe+order%3Arandom"
-                                    apiFetchProc.command = ["curl", "-s", "--connect-timeout", "5", "--max-time", "10", "-A", "lazerbar/1.0", url]
-                                    apiFetchProc.running = true
-                                } }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.fetchWallpaper() }
                             }
                         }
 
