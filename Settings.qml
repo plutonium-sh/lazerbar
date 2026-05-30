@@ -32,6 +32,7 @@ Rectangle {
     property bool showMediaDisplay: true
     property bool wallpaperEnabled: true
     property string wallpaperSource: "osu"
+    property string prefetchedWallpaper: ""
     property var barValues: []
     property int barCount: 24
     property string accentColor: "#ec8fbe"
@@ -220,26 +221,77 @@ Rectangle {
         function onWallpaperSourceChanged() { autoSave() }
     }
 
-    // inline wallpaper fetch via curl+jq
-    function fetchWallpaper() {
-        var cacheDir = Quickshell.env("HOME") + "/.config/quickshell/lazerbar/wallpapers"
-        var src = settingsContainer.wallpaperSource
-        var apiUrl = src === "osu"
-            ? "https://osu.ppy.sh/api/v2/seasonal-backgrounds"
-            : "https://konachan.net/post.json?limit=1&tags=rating%3Asafe+order%3Arandom"
-        var jqExpr = src === "osu"
-            ? ".backgrounds[0].url // empty"
-            : "(.[0] | .jpeg_url // .file_url // empty)"
+    // wallpaper source definitions
+    function getSourceInfo(source) {
+        if (source === "mixed") {
+            var pick = ["osu", "konachan"][Math.floor(Math.random() * 2)]
+            return settingsContainer.getSourceInfo(pick)
+        }
+        switch(source) {
+            case "osu":
+                return {
+                    apiUrl: "https://osu.ppy.sh/api/v2/seasonal-backgrounds",
+                    jqExpr: "[.backgrounds[].url] | .[(now * 1000 | floor) % length] // empty"
+                }
+            case "konachan":
+                return {
+                    apiUrl: "https://konachan.net/post.json?limit=1&tags=rating%3Asafe+order%3Arandom",
+                    jqExpr: "(.[0] | .jpeg_url // .file_url // empty)"
+                }
+            default:
+                return settingsContainer.getSourceInfo("mixed")
+        }
+    }
 
-        var cmd = "url=$(curl -s -H 'User-Agent: Mozilla/5.0' '" + apiUrl + "' | jq -r '" + jqExpr + "') && " +
-            "test -n \"$url\" && test \"$url\" != \"null\" || exit 1; " +
-            "fname=$(basename \"${url%%\\?*}\" | python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))') && " +
+    // builds a shell command with fallback chain through all sources
+    function buildFallbackCmd(primaryUrl, primaryJq) {
+        var cacheDir = Quickshell.env("HOME") + "/.config/quickshell/lazerbar/wallpapers"
+        var curlOpts = "-s --connect-timeout 8 --max-time 20 --retry 2 --retry-delay 1"
+        // primary + all fallbacks, tried in order until one works
+        var fallbacks = [
+            [primaryUrl, primaryJq],
+            ["https://konachan.net/post.json?limit=1&tags=rating%3Asafe+order%3Arandom", "(.[0] | .jpeg_url // .file_url // empty)"],
+            ["https://osu.ppy.sh/api/v2/seasonal-backgrounds", ".backgrounds[0].url // empty"]
+        ]
+
+        var script = ""
+        for (var fi = 0; fi < fallbacks.length; fi++) {
+            if (fi > 0) script += " || "
+            script += "url=$(curl " + curlOpts + " '" + fallbacks[fi][0] + "' | jq -r '" + fallbacks[fi][1] + "') && [ -n \"$url\" ] && [ \"$url\" != \"null\" ]"
+        }
+        script += " || exit 1"
+
+        script += " && fname=$(basename \"${url%%\\?*}\" | python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))') && " +
             "mkdir -p '" + cacheDir + "' && fpath=\"" + cacheDir + "/$fname\" && " +
             "if [ -f \"$fpath\" ]; then echo \"$fpath\"; " +
-            "else curl -sL --connect-timeout 10 --max-time 60 -o \"$fpath\" \"$url\" && echo \"$fpath\"; fi"
-        console.log("fetchWallpaper: cmd=", cmd)
-        apiFetchProc.command = ["sh", "-c", cmd]
-        apiFetchProc.running = true
+            "else curl -sL --connect-timeout 15 --max-time 60 --retry 2 --retry-delay 2 -o \"$fpath\" \"$url\" && echo \"$fpath\"; fi"
+
+        return script
+    }
+
+    // fetch and set wallpaper immediately
+    function fetchWallpaper() {
+        if (settingsContainer.prefetchedWallpaper) {
+            var cached = settingsContainer.prefetchedWallpaper
+            settingsContainer.prefetchedWallpaper = ""
+            settingsContainer.setWallpaperRequested(cached)
+            Qt.callLater(() => settingsContainer.fetchOne(true))
+            return
+        }
+        settingsContainer.fetchOne(false)
+    }
+
+    // internal: fetch to a path, optionally just caching
+    function fetchOne(isPrefetch) {
+        var info = settingsContainer.getSourceInfo(settingsContainer.wallpaperSource)
+        var cmd = settingsContainer.buildFallbackCmd(info.apiUrl, info.jqExpr)
+        if (isPrefetch) {
+            prefetchProc.command = ["sh", "-c", cmd]
+            prefetchProc.running = true
+        } else {
+            apiFetchProc.command = ["sh", "-c", cmd]
+            apiFetchProc.running = true
+        }
     }
 
     Process {
@@ -248,14 +300,28 @@ Rectangle {
         stdout: SplitParser {
             onRead: data => {
                 var path = data.trim()
-                console.log("apiFetchProc stdout:", path)
                 if (path.length > 0) {
                     settingsContainer.setWallpaperRequested(path)
+                    // pre-fetch next wallpaper in background
+                    Qt.callLater(() => settingsContainer.fetchOne(true))
                 }
             }
         }
         onExited: (code) => {
-            console.log("apiFetchProc exited with code:", code)
+            console.log("apiFetchProc exited:", code)
+        }
+    }
+
+    Process {
+        id: prefetchProc
+        running: false
+        stdout: SplitParser {
+            onRead: data => {
+                var path = data.trim()
+                if (path.length > 0) {
+                    settingsContainer.prefetchedWallpaper = path
+                }
+            }
         }
     }
 
@@ -453,30 +519,34 @@ Rectangle {
                         }
 
                         // go poke the internet for fresh pixels
-                        RowLayout {
+                        Flow {
                             Layout.leftMargin: 16
                             Layout.fillWidth: true
-                            spacing: 6
+                            spacing: 4
                             visible: settingsContainer.wallpaperEnabled
 
-                            Text { text: "source"; color: "#888888"; font.family: "Torus"; font.pixelSize: 11; Layout.fillWidth: true }
+                            Text { text: "source"; color: "#888888"; font.family: "Torus"; font.pixelSize: 11; height: 26; verticalAlignment: Text.AlignVCenter }
 
                             Rectangle {
-                                id: osuBtn
-                                Layout.preferredWidth: 52; Layout.preferredHeight: 26; radius: 4
+                                width: 38; height: 26; radius: 4
                                 color: settingsContainer.wallpaperSource === "osu" ? settingsContainer.accentColor : settingsContainer.surfaceColor
-                                Text { anchors.centerIn: parent; text: "osu!"; color: osuBtn.color === settingsContainer.accentColor ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
+                                Text { anchors.centerIn: parent; text: "osu"; color: settingsContainer.wallpaperSource === "osu" ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
                                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.wallpaperSource = "osu" }
                             }
                             Rectangle {
-                                id: konachanBtn
-                                Layout.preferredWidth: 70; Layout.preferredHeight: 26; radius: 4
+                                width: 44; height: 26; radius: 4
                                 color: settingsContainer.wallpaperSource === "konachan" ? settingsContainer.accentColor : settingsContainer.surfaceColor
-                                Text { anchors.centerIn: parent; text: "konachan"; color: konachanBtn.color === settingsContainer.accentColor ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
+                                Text { anchors.centerIn: parent; text: "kona"; color: settingsContainer.wallpaperSource === "konachan" ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
                                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.wallpaperSource = "konachan" }
                             }
                             Rectangle {
-                                Layout.preferredWidth: 26; Layout.preferredHeight: 26; radius: 4; color: settingsContainer.accentColor
+                                width: 38; height: 26; radius: 4
+                                color: settingsContainer.wallpaperSource === "mixed" ? settingsContainer.accentColor : settingsContainer.surfaceColor
+                                Text { anchors.centerIn: parent; text: "mix"; color: settingsContainer.wallpaperSource === "mixed" ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.wallpaperSource = "mixed" }
+                            }
+                            Rectangle {
+                                width: 26; height: 26; radius: 4; color: settingsContainer.accentColor
                                 Text { anchors.centerIn: parent; text: "\u21BB"; color: "#181818"; font.pixelSize: 14; font.bold: true }
                                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.fetchWallpaper() }
                             }
