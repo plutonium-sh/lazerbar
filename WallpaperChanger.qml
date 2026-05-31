@@ -4,7 +4,6 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 
-// wallpaper panel - front and center, as god intended
 PanelWindow {
     id: root
     anchors { left: true; right: true; top: true; bottom: true }
@@ -21,18 +20,15 @@ PanelWindow {
     readonly property string cacheDir: configDir + "/wallpapers"
     readonly property string wallpaperJson: configDir + "/wallpapers.json"
 
-    // unprivileged background noise, don't mind me
     WlrLayershell.layer: WlrLayer.Background
     WlrLayershell.namespace: "quickshell:background"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    // the void stares back (until a wallpaper loads)
     Rectangle {
         anchors.fill: parent
         color: "#181818"
     }
 
-    // the main event, stretched to fit your life
     Image {
         id: bgImg
         anchors.fill: parent
@@ -41,30 +37,61 @@ PanelWindow {
         source: root.currentSrc
     }
 
-    // dramatic fade-to-black for smooth transitions (tm)
     Rectangle {
         id: fadeOverlay
         anchors.fill: parent
         color: "#181818"
         opacity: 0.0
-        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     }
 
-    // no-nonsense wallpaper mode: cut the middleman
+    PropertyAnimation {
+        id: fadeOut
+        target: fadeOverlay
+        property: "opacity"
+        from: 1.0
+        to: 0.0
+        duration: 350
+        easing.type: Easing.OutCubic
+    }
+
+    property bool pendingFade: false
+
     function setDirect(filePath) {
-        fadeOverlay.opacity = 1.0;
-        swapTimer.filePath = "file://" + filePath.split('/').map(encodeURIComponent).join('/');
-        swapTimer.start();
-        saveWallpaperJson(filePath);
+        fadeOverlay.opacity = 1.0
+        pendingFade = true
+        root.currentSrc = "file://" + filePath.split('/').map(encodeURIComponent).join('/')
+        saveWallpaperJson(filePath)
+        minTimer.restart()
     }
 
-    // glorified echo command with delusions of grandeur
+    Timer {
+        id: minTimer
+        interval: 200
+        onTriggered: tryFade()
+    }
+
+    function tryFade() {
+        if (bgImg.status === Image.Ready || bgImg.status === Image.Error) {
+            pendingFade = false
+            fadeOut.start()
+        }
+    }
+
+    Connections {
+        target: bgImg
+        function onStatusChanged() {
+            if (pendingFade && !minTimer.running && !fadeOut.running && (bgImg.status === Image.Ready || bgImg.status === Image.Error)) {
+                pendingFade = false
+                fadeOut.start()
+            }
+        }
+    }
+
     Process {
         id: jsonWriter
         running: false
     }
 
-    // reading yesterday's homework and praying it's right
     Process {
         id: jsonReader
         running: false
@@ -82,10 +109,8 @@ PanelWindow {
         }
     }
 
-    // the world's most overqualified wallpaper saver
     function saveWallpaperJson(filePath) {
         root.savedWallpaper = filePath;
-        // store path relative to configDir for portability
         var relPath = filePath.startsWith(root.configDir + "/") ? filePath.substring(root.configDir.length + 1) : filePath;
         var data = JSON.stringify({"current": relPath});
         var sanitized = data.replace(/'/g, "'\\''");
@@ -98,19 +123,6 @@ PanelWindow {
         jsonReader.running = true;
     }
 
-    // 220ms of suspense -- will it blend?
-    Timer {
-        id: swapTimer
-        property string filePath: ""
-        interval: 220
-        repeat: false
-        onTriggered: {
-            root.currentSrc = filePath;
-            fadeOverlay.opacity = 0.0;
-        }
-    }
-
-    // wallpaper existential crisis handler
     onEnabledChanged: {
         if (root.enabled) {
             if (root.savedWallpaper) {
