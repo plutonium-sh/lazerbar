@@ -269,19 +269,10 @@ Rectangle {
         return script
     }
 
-    // fetch and set wallpaper immediately
     function fetchWallpaper() {
-        if (settingsContainer.prefetchedWallpaper) {
-            var cached = settingsContainer.prefetchedWallpaper
-            settingsContainer.prefetchedWallpaper = ""
-            settingsContainer.setWallpaperRequested(cached)
-            Qt.callLater(() => settingsContainer.fetchOne(true))
-            return
-        }
         settingsContainer.fetchOne(false)
     }
 
-    // internal: fetch to a path, optionally just caching
     function fetchOne(isPrefetch) {
         var info = settingsContainer.getSourceInfo(settingsContainer.wallpaperSource)
         var cmd = settingsContainer.buildFallbackCmd(info.apiUrl, info.jqExpr)
@@ -300,15 +291,9 @@ Rectangle {
         stdout: SplitParser {
             onRead: data => {
                 var path = data.trim()
-                if (path.length > 0) {
+                if (path.length > 0)
                     settingsContainer.setWallpaperRequested(path)
-                    // pre-fetch next wallpaper in background
-                    Qt.callLater(() => settingsContainer.fetchOne(true))
-                }
             }
-        }
-        onExited: (code) => {
-            console.log("apiFetchProc exited:", code)
         }
     }
 
@@ -318,9 +303,8 @@ Rectangle {
         stdout: SplitParser {
             onRead: data => {
                 var path = data.trim()
-                if (path.length > 0) {
+                if (path.length > 0)
                     settingsContainer.prefetchedWallpaper = path
-                }
             }
         }
     }
