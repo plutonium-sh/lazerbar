@@ -544,7 +544,7 @@ PanelWindow {
 // notifications - because i can't go 10 milliseconds without dopamine
     PopupWindow {
         id: notifPopup
-        width: 400
+        implicitWidth: 400
         // don't set this to 0 or wayland will literally kill you
         implicitHeight: Math.max(notifList.contentHeight, 1)
         visible: settingsPanel.showNotifPopup
@@ -640,8 +640,8 @@ PanelWindow {
         visible: false
         color: "transparent"
         focusable: true
-        width: 380
-        height: 750
+        implicitWidth: 380
+        implicitHeight: 750
 
         // settings panel - the control room for your questionable choices
         Settings {
@@ -1071,6 +1071,14 @@ PanelWindow {
         }
     }
 } // i promise this is the last "are you sure?" dialog. probably.
+
+    // app launcher - separate module so you can bind it to a key and feel powerful
+    AppLauncher {
+        id: appLauncher
+        surfaceColor: settingsPanel.surfaceColor
+        accentColor: settingsPanel.accentColor
+        borderColor: settingsPanel.borderColor
+    }
 
     // wallpaper panel - covering your desktop's existential void
     WallpaperChanger {
