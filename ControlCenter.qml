@@ -577,7 +577,7 @@ Rectangle {
 
                         Repeater {
                             model: [
-                                { label: "lock", icon: "\uD83D\uDD12", cmd: "hyprlock" },
+                                { label: "lock", icon: "\uD83D\uDD12", cmd: "" },
                                 { label: "shot", icon: "\uD83D\uDCF7", cmd: "hyprshot -m region" },
                                 { label: "logout", icon: "\uD83D\uDEAA", cmd: "hyprctl dispatch exit" },
                                 { label: "shutdown", icon: "\u23F0", cmd: "systemctl poweroff" },
