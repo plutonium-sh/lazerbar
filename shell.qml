@@ -617,6 +617,10 @@ PanelWindow {
                 ccWindow.visible = false
                 sessionLock.locked = true
             }
+            onExitConfirmRequested: (label, cmd) => {
+                exitConfirmPopup.pendingCommand = cmd
+                exitConfirmPopup.visible = true
+            }
         }
     }
 
@@ -799,6 +803,274 @@ PanelWindow {
             }
         }
     }
+
+// exit confirmation - the "oh god what have i done" dialog
+// osu!lazer style because bad decisions deserve good aesthetics
+PanelWindow {
+    id: exitConfirmPopup
+
+    visible: false
+    color: "transparent"
+    focusable: true
+
+    anchors {
+        left: true
+        right: true
+        top: true
+        bottom: true
+    }
+
+    // the command we're about to unleash upon the unsuspecting system
+    property string pendingCommand: ""
+
+    // existential dread overlay
+    Rectangle {
+        anchors.fill: parent
+        color: Qt.alpha("#000000", 0.88)
+
+        // the "are you sure?" box - last stop before the void
+        Rectangle {
+            id: dialogBox
+
+            width: 820
+            height: 520
+
+            anchors.centerIn: parent
+
+            radius: 22
+            color: settingsPanel.bgColor
+
+            // darker bottom strip - for dramatic effect
+            Rectangle {
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                }
+
+                height: 165
+                color: Qt.darker(settingsPanel.bgColor, 2.5)
+                radius: 22
+            }
+
+            // content that questions your life choices
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 40
+                spacing: 0
+
+                // breathing room at the top - contemplate your mortality
+                Item {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 135
+                }
+
+                // the big question
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+
+                    text: "Are you sure you want to exit Hyprland?"
+                    color: "white"
+                    font.family: "Torus"
+                    font.pixelSize: 34
+                    font.weight: Font.Medium
+                }
+
+                // the "you can still walk away" tagline
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 16
+
+                    text: "Last chance to turn back"
+                    color: "white"
+                    opacity: 0.8
+                    font.family: "Torus"
+                    font.pixelSize: 18
+                }
+
+                // push buttons to the bottom - gravity of the situation
+                Item {
+                    Layout.fillHeight: true
+                }
+
+                // the "i regret nothing" button
+                Item {
+                    Layout.alignment: Qt.AlignHCenter
+
+                    width: 680
+                    height: 72
+
+                    Canvas {
+                        id: confirmCanvas
+                        anchors.fill: parent
+                        antialiasing: true
+
+                        property bool hovered: false
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.reset();
+
+                            const w = width;
+                            const h = height;
+                            const s = 18;
+
+                            // parallelogram: because rectangles are cowards
+                            ctx.beginPath();
+                            ctx.moveTo(s, 0);
+                            ctx.lineTo(w, 0);
+                            ctx.lineTo(w - s, h);
+                            ctx.lineTo(0, h);
+                            ctx.closePath();
+
+                            const fillC = hovered
+                                ? Qt.lighter(settingsPanel.accentColor, 1.15)
+                                : settingsPanel.accentColor;
+
+                            ctx.fillStyle = fillC;
+                            ctx.fill();
+
+                            // that subtle edge glow - chefs kiss
+                            ctx.strokeStyle = Qt.lighter(fillC, 1.08);
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+
+                        Connections {
+                            target: confirmMouse
+
+                            function onContainsMouseChanged() {
+                                confirmCanvas.hovered = confirmMouse.containsMouse;
+                                confirmCanvas.requestPaint();
+                            }
+                        }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+
+                        text: "Let me out!"
+                        color: "white"
+
+                        font.family: "Torus"
+                        font.pixelSize: 20
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        id: confirmMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: {
+                            if (exitConfirmPopup.pendingCommand) {
+                                Quickshell.execDetached({
+                                    command: [
+                                        "sh",
+                                        "-c",
+                                        exitConfirmPopup.pendingCommand
+                                    ]
+                                });
+                            }
+
+                            // close yourself, you're done here
+                            exitConfirmPopup.visible = false;
+                        }
+                    }
+                }
+
+                // gap of hesitation
+                Item {
+                    Layout.preferredHeight: 10
+                }
+
+                // the "i've seen the error of my ways" button
+                Item {
+                    Layout.alignment: Qt.AlignHCenter
+
+                    width: 680
+                    height: 72
+
+                    Canvas {
+                        id: cancelCanvas
+                        anchors.fill: parent
+                        antialiasing: true
+
+                        property bool hovered: false
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.reset();
+
+                            const w = width;
+                            const h = height;
+                            const s = 18;
+
+                            // same slanted shape, same energy
+                            ctx.beginPath();
+                            ctx.moveTo(s, 0);
+                            ctx.lineTo(w, 0);
+                            ctx.lineTo(w - s, h);
+                            ctx.lineTo(0, h);
+                            ctx.closePath();
+
+                            const fillC = hovered
+                                ? Qt.lighter(settingsPanel.surfaceColor, 1.4)
+                                : settingsPanel.surfaceColor;
+
+                            ctx.fillStyle = fillC;
+                            ctx.fill();
+
+                            ctx.strokeStyle = Qt.lighter(fillC, 1.15);
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+
+                        Connections {
+                            target: cancelMouse
+
+                            function onContainsMouseChanged() {
+                                cancelCanvas.hovered = cancelMouse.containsMouse;
+                                cancelCanvas.requestPaint();
+                            }
+                        }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+
+                        text: "Nevermind!"
+                        color: "white"
+
+                        font.family: "Torus"
+                        font.pixelSize: 20
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        id: cancelMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: {
+                            // phew, that was close
+                            exitConfirmPopup.visible = false;
+                        }
+                    }
+                }
+
+                // bottom padding - gotta land somewhere
+                Item {
+                    Layout.preferredHeight: 28
+                }
+            }
+        }
+    }
+} // i promise this is the last "are you sure?" dialog. probably.
 
     // wallpaper panel - covering your desktop's existential void
     WallpaperChanger {
