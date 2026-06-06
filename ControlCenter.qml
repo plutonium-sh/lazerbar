@@ -25,6 +25,7 @@ Rectangle {
     property int pomodoroWorkDuration: 25
     property int pomodoroBreakDuration: 5
     signal lockRequested
+    signal exitConfirmRequested(string label, string cmd)
     property bool hasRealBattery: {
         if (!UPower || !UPower.devices) return false;
         var count = UPower.devices.count;
@@ -626,6 +627,8 @@ Rectangle {
                                         onClicked: {
                                             if (modelData.label === "lock")
                                                 ccContainer.lockRequested()
+                                            else if (modelData.label === "logout" || modelData.label === "shutdown" || modelData.label === "reboot")
+                                                ccContainer.exitConfirmRequested(modelData.label, modelData.cmd)
                                             else
                                                 Quickshell.execDetached({ command: ["sh", "-c", modelData.cmd] })
                                         }
