@@ -694,6 +694,202 @@ Rectangle {
                             accentColor: settingsContainer.accentColor
                         }
 
+                        // live footage of your audio apps (and their volume)
+                        Text {
+                            text: "applications"
+                            visible: mixerModel.count > 0
+                            color: "#888888"
+                            font.family: "Torus"
+                            font.pixelSize: 11
+                        }
+
+                        ColumnLayout {
+                            visible: mixerModel.count > 0
+                            Layout.fillWidth: true
+                            spacing: 4
+
+                            Repeater {
+                                model: mixerModel
+
+                                delegate: Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 34
+                                    radius: 4
+                                    color: "#1e1e26"
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
+                                        anchors.rightMargin: 8
+                                        spacing: 6
+
+                                        Text {
+                                            text: model.name
+                                            color: "#ffffff"
+                                            font.family: "Torus"
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                            Layout.preferredWidth: 72
+                                        }
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            height: 18
+                                            radius: 3
+                                            color: "#2a2a32"
+                                            clip: true
+
+                                            Rectangle {
+                                                height: parent.height
+                                                width: parent.width * model.volume
+                                                radius: 3
+                                                color: settingsContainer.accentColor
+                                                Behavior on width { NumberAnimation { duration: 80 } }
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onPressed: (mouse) => col1.setMixerVolume(model.id, Math.max(0, Math.min(1, mouse.x / width)))
+                                                onPositionChanged: (mouse) => { if (pressed) col1.setMixerVolume(model.id, Math.max(0, Math.min(1, mouse.x / width))) }
+                                            }
+                                        }
+
+                                        Text {
+                                            text: Math.round(model.volume * 100) + "%"
+                                            color: settingsContainer.accentColor
+                                            font.family: "Torus"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            horizontalAlignment: Text.AlignHCenter
+                                            Layout.preferredWidth: 30
+                                        }
+
+                                        Rectangle {
+                                            Layout.preferredWidth: 18
+                                            Layout.preferredHeight: 18
+                                            radius: 3
+                                            color: model.muted ? settingsContainer.accentColor : "#3a3a44"
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: model.muted ? "\u25CB" : "\u25CF"
+                                                color: model.muted ? "#181818" : "#888888"
+                                                font.pixelSize: 9
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: col1.setMixerMute(model.id, !model.muted)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        ListModel { id: mixerModel }
+
+                        Process {
+                            id: mixerRead
+                            running: false
+                            stdout: StdioCollector {
+                                onStreamFinished: col1.parseMixerOutput(text)
+                            }
+                        }
+
+                        Process {
+                            id: mixerWrite
+                            running: false
+                        }
+
+                        Timer {
+                            id: mixerTimer
+                            interval: 2000
+                            repeat: true
+                            running: settingsContainer.activeCategory === 1
+                            onRunningChanged: { if (running) col1.refreshMixer() }
+                            onTriggered: col1.refreshMixer()
+                        }
+
+                        function refreshMixer() {
+                            // go fetch the tea on who's making noise
+                            mixerRead.command = ["sh", "-c", "/usr/bin/pactl list sink-inputs 2>/dev/null || true"]
+                            mixerRead.running = true
+                        }
+
+                        function parseMixerOutput(text) {
+                            // turn raw pactl noise into something that resembles data
+                            if (!text || text.trim().length === 0) { mixerModel.clear(); return }
+                            var lines = text.split('\n')
+                            var parsed = {}
+                            var order = []
+                            var current = null
+                            for (var i = 0; i < lines.length; i++) {
+                                var line = lines[i]
+                                var m = line.match(/^Sink Input #(\d+)/)
+                                if (m) {
+                                    if (current) { parsed[current.id] = current; order.push(current.id) }
+                                    current = { id: parseInt(m[1]), name: "Unknown", volume: 1.0, muted: false }
+                                } else if (current) {
+                                    var n = line.match(/^\s+application\.name\s*=\s*"(.*)"\s*$/)
+                                    if (n) current.name = n[1]
+                                    var u = line.match(/^\s+Mute:\s+(yes|no)/)
+                                    if (u) current.muted = u[1] === 'yes'
+                                    var v = line.match(/Volume:\s+.*?(\d+)%\s+/)
+                                    if (v) current.volume = Math.min(1, parseInt(v[1]) / 100)
+                                }
+                            }
+                            if (current) { parsed[current.id] = current; order.push(current.id) }
+
+                            // remove entries that are dead to us
+                            for (var j = mixerModel.count - 1; j >= 0; j--) {
+                                if (!parsed[mixerModel.get(j).id])
+                                    mixerModel.remove(j)
+                            }
+
+                            // update existing or welcome the newcomer
+                            for (var k = 0; k < order.length; k++) {
+                                var entry = parsed[order[k]]
+                                var found = false
+                                for (var l = 0; l < mixerModel.count; l++) {
+                                    if (mixerModel.get(l).id === entry.id) {
+                                        mixerModel.setProperty(l, "name", entry.name)
+                                        mixerModel.setProperty(l, "volume", entry.volume)
+                                        mixerModel.setProperty(l, "muted", entry.muted)
+                                        found = true
+                                        break
+                                    }
+                                }
+                                if (!found)
+                                    mixerModel.append(entry)
+                            }
+                        }
+
+                        function setMixerVolume(id, vol) {
+                            // scream at pipewire until it listens
+                            var pct = Math.round(vol * 100)
+                            mixerWrite.command = ["sh", "-c", "/usr/bin/pactl set-sink-input-volume " + id + " " + pct + "% 2>/dev/null"]
+                            mixerWrite.running = true
+                            for (var i = 0; i < mixerModel.count; i++) {
+                                if (mixerModel.get(i).id === id) {
+                                    mixerModel.setProperty(i, "volume", vol)
+                                    break
+                                }
+                            }
+                        }
+
+                        function setMixerMute(id, muted) {
+                            // shut them up or let them speak
+                            mixerWrite.command = ["sh", "-c", "/usr/bin/pactl set-sink-input-mute " + id + " " + (muted ? 1 : 0) + " 2>/dev/null"]
+                            mixerWrite.running = true
+                            for (var i = 0; i < mixerModel.count; i++) {
+                                if (mixerModel.get(i).id === id) {
+                                    mixerModel.setProperty(i, "muted", muted)
+                                    break
+                                }
+                            }
+                        }
+
                         Item { Layout.fillHeight: true }
                     }
                     }
