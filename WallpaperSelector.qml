@@ -13,6 +13,7 @@ PanelWindow {
     property string bgColor: "#111111"
     property string surfaceColor: "#1e1e1e"
     property string borderColor: "#2a2a2a"
+    property string currentWallpaper: ""
 
     readonly property string home: Quickshell.env("HOME")
     readonly property string wallpaperDir: home + "/.config/quickshell/lazerbar/wallpapers"
@@ -55,6 +56,14 @@ PanelWindow {
                     var name = lines[i].trim()
                     if (name === "") continue
                     wallpaperModel.append({ name: name, path: root.wallpaperDir + "/" + name })
+                }
+                // highlight the currently active wallpaper
+                grid.currentIndex = -1
+                for (var j = 0; j < wallpaperModel.count; j++) {
+                    if (wallpaperModel.get(j).path === root.currentWallpaper) {
+                        grid.currentIndex = j
+                        break
+                    }
                 }
             }
         }
