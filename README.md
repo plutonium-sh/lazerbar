@@ -56,4 +56,5 @@ add these to your `hyprland.conf`,
 
 ## screenshot
 
-<img width="1920" height="1080" alt="screenshot" src="https://github.com/user-attachments/assets/64b0a9e2-b80f-40a1-a79a-ff23077ca1e5" />
+<img width="1920" height="1080" alt="2026-06-06-141115_hyprshot" src="https://github.com/user-attachments/assets/40edf5cb-1049-42dd-8105-66ba7e78a432" />
+
