@@ -1,26 +1,59 @@
 # lazerbar
-A Quickshell config based on the top bar from osu!lazer,
+
+a Quickshell config based on the top bar from osu!lazer,
 btw this is Hyprland only because it's lwk the best twm ever
 
-<img width="1920" height="1080" alt="2026-05-26-212141_hyprshot" src="https://github.com/user-attachments/assets/64b0a9e2-b80f-40a1-a79a-ff23077ca1e5" />
-
 ## features
-- **top bar** -- basically the osu!lazer top bar, but a Hyprland top bar
-- **cc** -- calendar, weather, battery (i'm on desktop idk if this works or not), notif center, pomodoro timer, brightness slider, wifi manager, and system info
-- **settings** -- toggle top bar elements, pick wallpaper, customize colors, and audio spectrum visualizer
+
+- **top bar** -- the osu!lazer top bar, now on your Hyprland desktop. workspaces, system tray, clock, session timer, analog clock, media controls, volume scroll, audio visualizer
+- **app launcher** -- full-screen overlay search with desktopentries integration, math evaluation via `qalc` (trig, logs, everything), and a globalshortcut keybind
+- **control center** -- calendar, weather, battery (upower), notification history, pomodoro timer, brightness slider (ddcutil), wifi manager, system info (hostname/distro/kernel/uptime),
+- **settings** -- toggle bar elements, pick wallpapers from osu!/konachan, customize colors (accent, bg, surface, border, workspace), customizable colors, bar opacity, audio mixer with spectrum visualizer
+- **wallpaper** -- wallpaper, also a konachan/osu! fetcher in settings
 - **lockscreen** -- PAM auth, this lwk just exists 👍
 - **notifications** -- dopamine.
 
-## reqs
+## required
+
+- [Hyprland](https://hyprland.org/)
 - [Quickshell](https://quickshell.org/)
-- [Hyprland](https://hypr.land/) (in case i need to state it again)
 - [Torus font](https://github.com/ppy/osu-web/tree/master/resources/fonts/torus)
-- Optional: nmcli, brightnessctl, hyprshot, gtk-launch
+- `pipewire` / `libpipewire` -- audio
+- MPRIS-compatible D-Bus service -- media player controls
+- `freedesktop.org` notifications D-Bus service
+- PAM (Pluggable Authentication Modules) -- lockscreen
+
+## optional
+
+| Dependency                | Used for                              |
+| ------------------------- | ------------------------------------- |
+| `nmcli` (networkmanager)  | wifi radio toggle                     |
+| `ddcutil`                 | monitor brightness control via ddc/ci |
+| `qalc` (libqalculate)     | advanced math in the app launcher     |
+| `wl-clipboard`            | copy math results                     |
+| `curl` + `jq`             | fetching wallpapers & weather         |
+| `hyprshot`                | screenshot (region mode)              |
+| `notify-send` (libnotify) | pomodoro timer notifications          |
+| `pactl` (pipewire-pulse)  | per-application audio mixer           |
+| `gtk-launch`              | launch apps from notification clicks  |
 
 ## installation
-- git clone the repo
-- drop the clone into ~/.config/quickshell/
-- run qs -c lazerbar (or put it in your exec-once)
-- try it out!
 
-# jsyk, i donated 10 euros to KDE for their 30th birthday and now i'm NOT a linux larp
+```bash
+git clone https://github.com/yourname/lazerbar.git ~/.config/quickshell/lazerbar
+# install deps from the lists above
+qs -c lazerbar  # or add to hyprland exec-once
+```
+
+## keybinds
+
+| Key                                                       | Action                    |
+| --------------------------------------------------------- | ------------------------- |
+| `$mainMod, D, global, quickshell:launcher`                | toggle app launcher       |
+| `$mainMod, W, global, quickshell:wallpaperSelectorToggle` | toggle wallpaper selector |
+
+add these to your `hyprland.conf`, 
+
+## screenshot
+
+<img width="1920" height="1080" alt="screenshot" src="https://github.com/user-attachments/assets/64b0a9e2-b80f-40a1-a79a-ff23077ca1e5" />
