@@ -813,6 +813,7 @@ PanelWindow {
         bgColor: settingsPanel.bgColor
         surfaceColor: settingsPanel.surfaceColor
         borderColor: settingsPanel.borderColor
+        currentWallpaper: wallpaperChanger.savedWallpaper
         onWallpaperApplyRequested: (filePath) => wallpaperChanger.setDirect(filePath)
     }
 
