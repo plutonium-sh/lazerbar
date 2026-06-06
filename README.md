@@ -40,7 +40,7 @@ btw this is Hyprland only because it's lwk the best twm ever
 ## installation
 
 ```bash
-git clone https://github.com/yourname/lazerbar.git ~/.config/quickshell/lazerbar
+git clone https://github.com/plutonium-sh/lazerbar.git ~/.config/quickshell/lazerbar
 # install deps from the lists above
 qs -c lazerbar  # or add to hyprland exec-once
 ```
