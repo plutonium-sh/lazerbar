@@ -40,7 +40,7 @@ PanelWindow {
     GlobalShortcut {
         name: "wallpaperSelectorToggle"
         description: "Toggle wallpaper selector"
-        onPressed: root.show()
+        onPressed: root.toggle()
     }
 
     // ls but with emotional support
@@ -78,6 +78,15 @@ PanelWindow {
         root.visible = true
         lister.running = true
         Qt.callLater(() => grid.forceActiveFocus())
+    }
+
+    // toggle visibility
+    function toggle() {
+        if (root.visible) {
+            root.visible = false
+        } else {
+            root.show()
+        }
     }
 
     // back to the void
