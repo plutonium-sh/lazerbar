@@ -40,6 +40,15 @@ PanelWindow {
 
     onQueryChanged: updateResults()
 
+    // clear search on close, auto-select first on open
+    onVisibleChanged: {
+        if (!appLauncher.visible) {
+            searchInput.text = "";
+        } else {
+            appLauncher.selectedIndex = 0;
+        }
+    }
+
     // debounced qalc process - like end-4 does it
     Process {
         id: qalcProc
@@ -122,6 +131,7 @@ PanelWindow {
         });
 
         results = matches.slice(0, 20);
+        if (results.length > 0 && appLauncher.selectedIndex < 0) appLauncher.selectedIndex = 0;
 
         // trigger qalc for math
         if (q && matches.length === 0) {
@@ -137,7 +147,6 @@ PanelWindow {
         appLauncher.visible = !appLauncher.visible;
         if (appLauncher.visible) {
             appLauncher.query = "";
-            appLauncher.selectedIndex = -1;
             searchInput.forceActiveFocus();
         }
     }
@@ -162,257 +171,255 @@ PanelWindow {
         selectedIndex = selectedIndex <= 0 ? results.length - 1 : selectedIndex - 1;
     }
 
-    // the void
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.alpha("#000000", 0.88)
+    // center column - search up top, results below
+    ColumnLayout {
+        anchors {
+            top: parent.top
+            horizontalCenter: parent.horizontalCenter
+            topMargin: 140
+        }
+        width: 600
+        spacing: 8
 
-        // center column - search up top, results below
-        ColumnLayout {
-            anchors {
-                top: parent.top
-                horizontalCenter: parent.horizontalCenter
-                topMargin: 180
+        // search bar - the oracle
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 64
+            radius: 16
+            color: appLauncher.surfaceColor
+            border.width: searchInput.activeFocus ? 2 : 1
+            border.color: searchInput.activeFocus ? appLauncher.accentColor : appLauncher.borderColor
+            Behavior on border.color { ColorAnimation { duration: 120 } }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 20
+                anchors.rightMargin: 12
+                spacing: 12
+
+                Image {
+                    source: `file://${Quickshell.env("HOME")}/.config/quickshell/lazerbar/assets/search.png`
+                    sourceSize.width: 22
+                    sourceSize.height: 22
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                }
+
+                TextInput {
+                    id: searchInput
+                    Layout.fillWidth: true
+                    color: "#ffffff"
+                    font.family: "Torus"
+                    font.pixelSize: 20
+                    font.bold: true
+                    clip: true
+                    verticalAlignment: TextInput.AlignVCenter
+                    selectByMouse: true
+
+                    Keys.enabled: true
+
+                    onTextChanged: {
+                        appLauncher.selectedIndex = -1;
+                        appLauncher.query = text;
+                    }
+
+                    Keys.onEscapePressed: appLauncher.visible = false
+                    Keys.onUpPressed: appLauncher.selectPrev()
+                    Keys.onDownPressed: appLauncher.selectNext()
+                    Keys.onReturnPressed: {
+                        if (appLauncher.selectedIndex < 0 || appLauncher.selectedIndex >= appLauncher.results.length) return;
+                        var sel = appLauncher.results[appLauncher.selectedIndex];
+                        if (sel && sel.__calc) {
+                            Quickshell.execDetached({ command: ["sh", "-c", "wl-copy " + sel.result] });
+                        } else if (sel && sel.app) {
+                            appLauncher.launchApp(sel.app);
+                        }
+                    }
+                }
+
+                // clear button
+                Rectangle {
+                    Layout.preferredWidth: 28
+                    Layout.preferredHeight: 28
+                    radius: 14
+                    color: clearMouse.containsMouse ? Qt.alpha(appLauncher.accentColor, 0.3) : "transparent"
+                    visible: appLauncher.query.length > 0
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "\u2715"
+                        color: "#888888"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: clearMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            searchInput.text = "";
+                            searchInput.forceActiveFocus();
+                        }
+                    }
+                }
             }
-            width: 600
-            spacing: 0
+        }
 
-            // search bar - the oracle
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 64
-                radius: 16
-                color: appLauncher.surfaceColor
-                border.width: searchInput.activeFocus ? 2 : 1
-                border.color: searchInput.activeFocus ? appLauncher.accentColor : appLauncher.borderColor
-                Behavior on border.color { ColorAnimation { duration: 120 } }
+        // results - the fruits of your typing labor
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(appLauncher.results.length * 54 + 12, 430)
+            radius: 12
+            color: appLauncher.surfaceColor
+            border.width: 1
+            border.color: appLauncher.borderColor
+            visible: appLauncher.results.length > 0 || appLauncher.isCalc
+            clip: true
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 20
-                    anchors.rightMargin: 20
-                    spacing: 12
+            ListView {
+                id: resultsList
+                anchors.fill: parent
+                anchors.margins: 6
+                model: appLauncher.results.length
+                spacing: 2
+                boundsBehavior: Flickable.StopAtBounds
 
-                    Image {
-                        source: `file://${Quickshell.env("HOME")}/.config/quickshell/lazerbar/assets/search.png`
-                        sourceSize.width: 22
-                        sourceSize.height: 22
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                    }
+                delegate: Item {
+                    required property int index
+                    width: resultsList.width
+                    height: 52
 
-                    TextInput {
-                        id: searchInput
-                        Layout.fillWidth: true
-                        color: "#ffffff"
-                        font.family: "Torus"
-                        font.pixelSize: 20
-                        font.bold: true
-                        clip: true
-                        verticalAlignment: TextInput.AlignVCenter
-                        selectByMouse: true
+                    property var appData: appLauncher.results[index]
+                    property bool isCalc: appData !== undefined && appData !== null && appData.__calc === true
 
-                        Keys.enabled: true
-
-                        onTextChanged: {
-                            appLauncher.query = text;
-                            appLauncher.selectedIndex = -1;
-                        }
-
-                        Keys.onEscapePressed: appLauncher.visible = false
-                        Keys.onUpPressed: appLauncher.selectPrev()
-                        Keys.onDownPressed: appLauncher.selectNext()
-                        Keys.onReturnPressed: {
-                            if (appLauncher.selectedIndex < 0 || appLauncher.selectedIndex >= appLauncher.results.length) return;
-                            var sel = appLauncher.results[appLauncher.selectedIndex];
-                            if (sel && sel.__calc) {
-                                Quickshell.execDetached({ command: ["sh", "-c", "wl-copy " + sel.result] });
-                            } else if (sel && sel.app) {
-                                appLauncher.launchApp(sel.app);
-                            }
-                        }
-                    }
-
-                    // clear button
                     Rectangle {
-                        Layout.preferredWidth: 28
-                        Layout.preferredHeight: 28
-                        radius: 14
-                        color: clearMouse.containsMouse ? Qt.alpha(appLauncher.accentColor, 0.3) : "transparent"
-                        visible: appLauncher.query.length > 0
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "✕"
-                            color: "#888888"
-                            font.pixelSize: 14
+                        anchors.fill: parent
+                        radius: 10
+                        color: {
+                            if (appLauncher.selectedIndex === index) return Qt.alpha(appLauncher.accentColor, 0.2);
+                            if (resMouse.containsMouse) return Qt.alpha(appLauncher.accentColor, 0.1);
+                            return "transparent";
                         }
+                        Behavior on color { ColorAnimation { duration: 80 } }
 
-                        MouseArea {
-                            id: clearMouse
+                        RowLayout {
                             anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                searchInput.text = "";
-                                searchInput.forceActiveFocus();
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 12
+
+                            // icon - calc icon for math, app icon for everything else
+                            Image {
+                                id: appIcon
+                                Layout.preferredWidth: 32
+                                Layout.preferredHeight: 32
+                                source: isCalc
+                                    ? `file://${Quickshell.env("HOME")}/.config/quickshell/lazerbar/assets/search.png`
+                                    : (appData && appData.app ? iconUrl(appData.app.icon) : "")
+                                smooth: true
+                                sourceSize.width: 32
+                                sourceSize.height: 32
+                                fillMode: Image.PreserveAspectFit
                             }
-                        }
-                    }
-                }
-            }
 
-            // results - the fruits of your typing labor
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(appLauncher.results.length * 56, 400)
-                Layout.topMargin: 12
-                clip: true
+                            // fallback when the icon fairy didn't show up
+                            Rectangle {
+                                Layout.preferredWidth: 32
+                                Layout.preferredHeight: 32
+                                radius: 8
+                                color: Qt.alpha("#ffffff", 0.05)
+                                visible: !isCalc && (!appIcon.source || appIcon.status !== Image.Ready)
 
-                ListView {
-                    id: resultsList
-                    anchors.fill: parent
-                    model: appLauncher.results.length
-                    spacing: 4
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    delegate: Item {
-                        required property int index
-                        width: resultsList.width
-                        height: 56
-
-                        property var appData: appLauncher.results[index]
-                        property bool isCalc: appData !== undefined && appData !== null && appData.__calc === true
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 12
-                            color: {
-                                if (appLauncher.selectedIndex === index) return Qt.alpha(appLauncher.accentColor, 0.25);
-                                if (resMouse.containsMouse) return Qt.alpha(appLauncher.accentColor, 0.12);
-                                return "transparent";
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: appData && appData.app && appData.app.name ? appData.app.name.charAt(0).toUpperCase() : "?"
+                                    color: "#888888"
+                                    font.family: "Torus"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                }
                             }
-                            Behavior on color { ColorAnimation { duration: 80 } }
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 16
-                                anchors.rightMargin: 16
-                                spacing: 16
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
 
-                                // icon - calc icon for math, app icon for everything else
-                                Image {
-                                    id: appIcon
-                                    Layout.preferredWidth: 36
-                                    Layout.preferredHeight: 36
-                                    source: isCalc
-                                        ? `file://${Quickshell.env("HOME")}/.config/quickshell/lazerbar/assets/search.png`
-                                        : (appData && appData.app ? iconUrl(appData.app.icon) : "")
-                                    smooth: true
-                                    sourceSize.width: 36
-                                    sourceSize.height: 36
-                                    fillMode: Image.PreserveAspectFit
-                                }
-
-                                // fallback when the icon fairy didn't show up
-                                Rectangle {
-                                    Layout.preferredWidth: 36
-                                    Layout.preferredHeight: 36
-                                    radius: 8
-                                    color: appLauncher.surfaceColor
-                                    visible: !isCalc && (!appIcon.source || appIcon.status !== Image.Ready)
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: appData && appData.app && appData.app.name ? appData.app.name.charAt(0).toUpperCase() : "?"
-                                        color: "#888888"
-                                        font.family: "Torus"
-                                        font.bold: true
-                                        font.pixelSize: 16
-                                    }
-                                }
-
-                                ColumnLayout {
+                                Text {
                                     Layout.fillWidth: true
-                                    spacing: 2
-
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: isCalc ? appData.expression + " = " + appData.result : (appData && appData.app ? appData.app.name : "")
-                                        color: "#ffffff"
-                                        font.family: "Torus"
-                                        font.pixelSize: 16
-                                        font.bold: true
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: isCalc ? "click or enter to copy" : (appData && appData.app ? (appData.app.comment || appData.app.genericName || "") : "")
-                                        color: "#888888"
-                                        font.family: "Torus"
-                                        font.pixelSize: 12
-                                        elide: Text.ElideRight
-                                        visible: text.length > 0
-                                    }
+                                    text: isCalc ? appData.expression + " = " + appData.result : (appData && appData.app ? appData.app.name : "")
+                                    color: "#ffffff"
+                                    font.family: "Torus"
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                    elide: Text.ElideRight
                                 }
 
-                                // calc result badge
-                                Rectangle {
-                                    Layout.preferredWidth: 56
-                                    Layout.preferredHeight: 32
-                                    radius: 8
-                                    color: Qt.alpha(appLauncher.accentColor, 0.2)
-                                    visible: isCalc
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: isCalc ? "press enter to copy" : (appData && appData.app ? (appData.app.comment || appData.app.genericName || "") : "")
+                                    color: "#666666"
+                                    font.family: "Torus"
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                    visible: text.length > 0
+                                }
+                            }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: isCalc && appData ? appData.result : ""
-                                        color: appLauncher.accentColor
-                                        font.family: "Torus"
-                                        font.pixelSize: 16
-                                        font.bold: true
-                                    }
+                            // calc result badge
+                            Rectangle {
+                                Layout.preferredWidth: 56
+                                Layout.preferredHeight: 28
+                                radius: 6
+                                color: Qt.alpha(appLauncher.accentColor, 0.2)
+                                visible: isCalc
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: isCalc && appData ? appData.result : ""
+                                    color: appLauncher.accentColor
+                                    font.family: "Torus"
+                                    font.pixelSize: 14
+                                    font.bold: true
                                 }
                             }
                         }
+                    }
 
-                        MouseArea {
-                            id: resMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onEntered: appLauncher.selectedIndex = index
-                            onClicked: {
-                                if (isCalc && appData) {
-                                    Quickshell.execDetached({ command: ["sh", "-c", "wl-copy " + appData.result] });
-                                } else if (appData && appData.app) {
-                                    appLauncher.launchApp(appData.app);
-                                }
+                    MouseArea {
+                        id: resMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onEntered: appLauncher.selectedIndex = index
+                        onClicked: {
+                            if (isCalc && appData) {
+                                Quickshell.execDetached({ command: ["sh", "-c", "wl-copy " + appData.result] });
+                            } else if (appData && appData.app) {
+                                appLauncher.launchApp(appData.app);
                             }
                         }
                     }
                 }
             }
-
-            // empty state - when nobody's home
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillWidth: true
-                Layout.topMargin: 40
-                text: appLauncher.query.length > 0 ? "no apps found" : "start typing to search apps"
-                color: "#555555"
-                font.family: "Torus"
-                font.pixelSize: 14
-                visible: appLauncher.results.length === 0 && !appLauncher.isCalc
-            }
         }
 
-        // click outside to close
-        MouseArea {
-            anchors.fill: parent
-            z: -1
-            onClicked: appLauncher.visible = false
+        // empty state - when nobody's home
+        Text {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.fillWidth: true
+            text: appLauncher.query.length > 0 ? "no apps found" : "start typing"
+            color: "#444444"
+            font.family: "Torus"
+            font.pixelSize: 14
+            visible: appLauncher.results.length === 0 && !appLauncher.isCalc
         }
+    }
+
+    // click outside to close
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        onClicked: appLauncher.visible = false
     }
 }
