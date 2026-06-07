@@ -368,13 +368,14 @@ PanelWindow {
 
                             // calc result badge
                             Rectangle {
-                                Layout.preferredWidth: 56
+                                Layout.preferredWidth: Math.max(48, resultText.contentWidth + 24)
                                 Layout.preferredHeight: 28
                                 radius: 6
                                 color: Qt.alpha(appLauncher.accentColor, 0.2)
                                 visible: isCalc
 
                                 Text {
+                                    id: resultText
                                     anchors.centerIn: parent
                                     text: isCalc && appData ? appData.result : ""
                                     color: appLauncher.accentColor
