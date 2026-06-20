@@ -31,7 +31,7 @@ Rectangle {
     property int pomodoroBreakDuration: 5
     property bool showMediaDisplay: true
     property bool wallpaperEnabled: true
-    property string wallpaperSource: "osu"
+    property string wallpaperSource: "konachan"
     property string prefetchedWallpaper: ""
     property var barValues: []
     property int barCount: 24
@@ -224,22 +224,16 @@ Rectangle {
     // wallpaper source definitions
     function getSourceInfo(source) {
         if (source === "mixed") {
-            var pick = ["osu", "konachan"][Math.floor(Math.random() * 2)]
-            return settingsContainer.getSourceInfo(pick)
+            return settingsContainer.getSourceInfo("konachan")
         }
         switch(source) {
-            case "osu":
-                return {
-                    apiUrl: "https://osu.ppy.sh/api/v2/seasonal-backgrounds",
-                    jqExpr: "[.backgrounds[].url] | .[(now * 1000 | floor) % length] // empty"
-                }
             case "konachan":
                 return {
                     apiUrl: "https://konachan.net/post.json?limit=1&tags=rating%3Asafe+order%3Arandom",
                     jqExpr: "(.[0] | .jpeg_url // .file_url // empty)"
                 }
             default:
-                return settingsContainer.getSourceInfo("mixed")
+                return settingsContainer.getSourceInfo("konachan")
         }
     }
 
@@ -250,8 +244,7 @@ Rectangle {
         // primary + all fallbacks, tried in order until one works
         var fallbacks = [
             [primaryUrl, primaryJq],
-            ["https://konachan.net/post.json?limit=1&tags=rating%3Asafe+order%3Arandom", "(.[0] | .jpeg_url // .file_url // empty)"],
-            ["https://osu.ppy.sh/api/v2/seasonal-backgrounds", ".backgrounds[0].url // empty"]
+            ["https://konachan.net/post.json?limit=1&tags=rating%3Asafe+order%3Arandom", "(.[0] | .jpeg_url // .file_url // empty)"]
         ]
 
         var script = ""
@@ -512,22 +505,10 @@ Rectangle {
                             Text { text: "source"; color: "#888888"; font.family: "Torus"; font.pixelSize: 11; height: 26; verticalAlignment: Text.AlignVCenter }
 
                             Rectangle {
-                                width: 38; height: 26; radius: 4
-                                color: settingsContainer.wallpaperSource === "osu" ? settingsContainer.accentColor : settingsContainer.surfaceColor
-                                Text { anchors.centerIn: parent; text: "osu"; color: settingsContainer.wallpaperSource === "osu" ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
-                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.wallpaperSource = "osu" }
-                            }
-                            Rectangle {
                                 width: 44; height: 26; radius: 4
                                 color: settingsContainer.wallpaperSource === "konachan" ? settingsContainer.accentColor : settingsContainer.surfaceColor
                                 Text { anchors.centerIn: parent; text: "kona"; color: settingsContainer.wallpaperSource === "konachan" ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
                                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.wallpaperSource = "konachan" }
-                            }
-                            Rectangle {
-                                width: 38; height: 26; radius: 4
-                                color: settingsContainer.wallpaperSource === "mixed" ? settingsContainer.accentColor : settingsContainer.surfaceColor
-                                Text { anchors.centerIn: parent; text: "mix"; color: settingsContainer.wallpaperSource === "mixed" ? "#181818" : "#ffffff"; font.pixelSize: 11; font.bold: true }
-                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: settingsContainer.wallpaperSource = "mixed" }
                             }
                             Rectangle {
                                 width: 26; height: 26; radius: 4; color: settingsContainer.accentColor
