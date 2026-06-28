@@ -8,7 +8,7 @@ btw this is Hyprland only because it's lwk the best twm ever
 - **top bar** -- the osu!lazer top bar, now on your Hyprland desktop. workspaces, system tray, clock, session timer, analog clock, media controls, volume scroll, audio visualizer
 - **app launcher** -- full-screen overlay search with desktopentries integration, math evaluation via `qalc` (trig, logs, everything), and a globalshortcut keybind
 - **control center** -- calendar, weather, battery (upower), notification history, pomodoro timer, brightness slider (ddcutil), wifi manager, system info (hostname/distro/kernel/uptime),
-- **settings** -- toggle bar elements, pick wallpapers from osu!/konachan, customize colors (accent, bg, surface, border, workspace), customizable colors, bar opacity, audio mixer with spectrum visualizer
+- **settings** -- toggle bar elements, pick wallpapers from ~~osu!~~/konachan, customize colors (accent, bg, surface, border, workspace), customizable colors, bar opacity, audio mixer with spectrum visualizer
 - **wallpaper** -- wallpaper, also a konachan/osu! fetcher in settings
 - **lockscreen** -- PAM auth, this lwk just exists 👍
 - **notifications** -- dopamine.
